@@ -1,6 +1,6 @@
 ### What is mean total number of steps taken per day?
 
-#### Mean is in RED and Medain is in BLUE
+#### Mean is in RED and Median is in BLUE
 ![My plot](Plot_1.png) 
 
 
@@ -13,7 +13,7 @@
 
 ### Imputing missing values
 
-#### Mean is in RED and Medain is in BLUE
+#### Mean is in RED and Median is in BLUE
 
 ![My plot](Plot_3.png) 
 ![My plot](Plot_4.png) 
