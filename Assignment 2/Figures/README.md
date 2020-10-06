@@ -8,7 +8,7 @@
 
 ### Imputing missing values
 
-![My plot(Plot_3.png) 
+![My plot](Plot_3.png) 
 ![My plot](Plot_4.png) 
 
 ### Are there differences in activity patterns between weekdays and weekends?
