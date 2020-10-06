@@ -23,8 +23,11 @@ download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.z
 activity <- read.csv(unz("repdata_data_activity.zip", "activity.csv"), header = TRUE, na.strings = "NA")
 
 head(activity)
-
 summary(activity)
+activity_cleaned <- activity[complete.cases(activity),]
+activity_cleaned$date <- as.Date(activity_cleaned$date,"%Y-%m-%d")
+head(activity_cleaned)
+summary(activity_cleaned)
 ```
 
 ## What is mean total number of steps taken per day?
@@ -32,7 +35,7 @@ summary(activity)
 Mean is in red color and Median is in Blue color
 
 ```{r}
-activity_per_day<- activity %>% 
+activity_per_day<- activity_cleaned %>% 
     group_by(date) %>% 
     summarise(total_steps = sum(steps), .groups = "keep")
 
@@ -55,7 +58,7 @@ text (11000, 20, mean, col = "red", pos = 1, srt = 90)
 ## What is the average daily activity pattern?
 
 ```{r}
-activity_per_interval <- activity %>% 
+activity_per_interval <- activity_cleaned %>% 
     group_by(interval) %>% 
     summarise(total_steps = sum(steps, na.rm = TRUE), .groups = "keep")
 
@@ -69,17 +72,20 @@ text(1000, max, as.character(max), col = "red")
 
 ## Imputing missing values
 
+Do Results vary, if code missing values as 5
+
 ```{r}
 ## cleaning
-activity_cleaned <- activity[complete.cases(activity),]
-head(activity_cleaned)
-summary(activity_cleaned)
+activity_NA_0 <- activity
+activity_NA_0[is.na(activity_NA_0)] <- 5
+head(activity_NA_0)
+summary(activity_NA_0)
 
 ## missing values
-nrow(activity)-nrow(activity_cleaned)
+nrow(activity_NA_0)-nrow(activity)
 
 ## histogram
-activity_per_day<- activity_cleaned %>% 
+activity_per_day<- activity_NA_0 %>% 
     group_by(date) %>% 
     summarise(total_steps = sum(steps), .groups = "keep")
 
@@ -92,12 +98,13 @@ mean
 hist(activity_per_day$total_steps, main = "Histogram of Number of Steps per day", xlab = "Number of Steps")
 
 abline(v = median, col = "blue")
-text (10000, 20, median, col = "blue", pos = 1, srt = 90)
+text (11000, 20, median, col = "blue", pos = 1, srt = 90)
 
 abline(v = mean, col = "red", lty = 2)
-text (11000, 20, mean, col = "red", pos = 1, srt = 90)
+text (8500, 20, mean, col = "red", pos = 1, srt = 90)
+
 ## time series
-activity_per_interval <- activity_cleaned %>% 
+activity_per_interval <- activity_NA_0 %>% 
     group_by(interval) %>% 
     summarise(total_steps = sum(steps), .groups = "keep")
 
@@ -112,16 +119,15 @@ text(1000, max, as.character(max), col = "red")
 ## Are there differences in activity patterns between weekdays and weekends?
 
 ```{r}
-activity_cleaned$date <- as.Date(activity_cleaned$date, "%Y-%m-%d")
-activity_cleaned$day <- weekdays(activity_cleaned$date)
-activity_cleaned$day_type <- "Weekday"
-activity_cleaned$day_type[activity_cleaned$day %in% c("Saturday", "Sunday")] <- "Weekend"
-activity_cleaned$day_type <- as.factor(activity_cleaned$day_type)
+activity_NA_0$date <- as.Date(activity_NA_0$date, "%Y-%m-%d")
+activity_NA_0$day <- weekdays(activity_NA_0$date)
+activity_NA_0$day_type <- "Weekday"
+activity_NA_0$day_type[activity_NA_0$day %in% c("Saturday", "Sunday")] <- "Weekend"
+activity_NA_0$day_type <- as.factor(activity_NA_0$day_type)
 
-activity_per_interval <- activity_cleaned %>% 
+activity_per_interval <- activity_NA_0 %>% 
     group_by(interval, day_type) %>% 
     summarise(total_steps = sum(steps), .groups = "keep")
 
 xyplot(total_steps~ interval| day_type, data = activity_per_interval, type = "l", layout = c(1,2), xlab = "Interval", ylab = "Number of steps")
 ```
-
