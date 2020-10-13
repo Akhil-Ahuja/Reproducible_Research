@@ -1,0 +1,254 @@
+---
+title: "NOAA Exploratory Report"
+author: "Akhil Ahuja"
+date: "10/10/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# HEALTH AND ECONOMIC CONSEQUENCES OF SEVERE WEATHER
+
+
+
+## SYNOPSIS
+
+Storms and other severe weather conditions prove very harmful for public health and being. Hence it is the need of hour to analyze all the data that humans have collected and use it to predict future events and save as much destruction of life and property as possible. This report focuses on using the data from the U.S. National Oceanic and Atmospheric Administration’s (NOAA) storm database to answer the following questions:-
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+
+
+## DATA PROCESSING
+
+
+### Loading necessary packages
+
+If you don't have the following packages installed, you might need to install the packages to reproduce the same results. Use the command "install.packages(dplyr)" and "install.packages(RColorBrewer)" to install.
+
+```{r necessary packages, message=FALSE, warning=FALSE}
+library(dplyr)
+library(RColorBrewer)
+library(maps)
+```
+
+
+### Downloading and Reading Data
+
+```{r download and read}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",
+              "repdata_data_StromData.csv.bz2")
+SD <- read.csv("repdata_data_StromData.csv.bz2", header = TRUE)
+```
+
+
+### Getting to know the Data
+
+```{r know}
+names(SD)
+
+str(SD)
+```
+
+
+### Cleaning the Data
+
+We need only the following columns "EVTYPE", "FATALITIES", "INJURIES",  "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP". So, dropping the rest of the columns.
+
+```{r dopping columns}
+SD <- SD[,c("EVTYPE",
+            "FATALITIES",
+            "INJURIES", 
+            "PROPDMG", 
+            "PROPDMGEXP", 
+            "CROPDMG", 
+            "CROPDMGEXP",
+            "LATITUDE",
+            "LONGITUDE")]
+```
+
+### Checking for Zereos
+
+```{r checking for zeroes}
+str(SD[SD$FATALITIES == 0 & 
+             SD$INJURIES == 0 &
+             SD$PROPDMG == 0 &
+             SD$CROPDMG == 0, ])
+```
+There are 647664 rows in the data-frame containing values as 0. We are not interested in the 0 values because we want to find the events that have the maximum impact on health and economy, not the 0 impact. Hence we can filter our required data and remove all the rows in which both health and economy have 0 damage.
+
+```{r filter SD}
+SD <- SD[SD$FATALITIES > 0 | 
+             SD$INJURIES > 0 |
+             SD$PROPDMG > 0 |
+             SD$CROPDMG > 0 , ]
+dim(SD)
+```
+
+We will find the different types of values present in the exponent column of property damage (PROPDMGEXP).
+
+```{r look at PROPDMGEXP}
+unique(SD$PROPDMGEXP)
+```
+
+Now replacing the exponents with their numerical values.
+
+```{r clean PROPDMGEXP}
+options(scipen = 999) # For disabling scientific notation
+SD$PROPDMGEXP[SD$PROPDMGEXP == "" |
+                  SD$PROPDMGEXP == "0" |
+                  SD$PROPDMGEXP == "+" |
+                  SD$PROPDMGEXP == "?" | 
+                  SD$PROPDMGEXP == "-"] <- 1
+SD$PROPDMGEXP <- gsub("1", 10, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- gsub("[Hh]|2", 100, SD$PROPDMGEXP)
+SD$PROPDMGEXP <- gsub("[Kk]|3", 1000, SD$PROPDMGEXP)
+SD$PROPDMGEXP <- gsub("4", 10000, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- gsub("5", 100000, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- gsub("[Mm]|6", 1000000, SD$PROPDMGEXP)
+SD$PROPDMGEXP <- gsub("7", 10000000, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- gsub("8", 100000000, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- gsub("B", 1000000000, SD$PROPDMGEXP, fixed = TRUE)
+SD$PROPDMGEXP <- as.numeric(SD$PROPDMGEXP)
+```
+
+Now we can multiply the property damage values with their exponents to get the exact values.
+
+```{r clean PROPDMG}
+SD$PROPDMG <- SD$PROPDMG * SD$PROPDMGEXP
+```
+
+Similarly, finding the unique values present in Crop Damage Exponents column(CROPDMGEXP).
+
+```{r look at CROPDMGEXP}
+unique(SD$CROPDMGEXP)
+```
+
+Replacing the Crop Damage Exponents with their numerical values.
+
+```{r clean CROPDMGEXP}
+SD$CROPDMGEXP[SD$CROPDMGEXP == "" |
+                  SD$CROPDMGEXP == "0"|
+                  SD$CROPDMGEXP == "?"] <- 1
+SD$CROPDMGEXP <- gsub("2", 100, SD$CROPDMGEXP)
+SD$CROPDMGEXP <- gsub("[Kk]|3", 1000, SD$CROPDMGEXP)
+SD$CROPDMGEXP <- gsub("[Mm]|6", 1000000, SD$CROPDMGEXP)
+SD$CROPDMGEXP <- gsub("B", 1000000000, SD$CROPDMGEXP, fixed = TRUE)
+SD$CROPDMGEXP <- as.numeric(SD$CROPDMGEXP)
+```
+
+Now we can multiply the crop damage values with their exponents to get the exact values.
+
+```{r clean CROPDMG}
+SD$CROPDMG <- SD$CROPDMG * SD$CROPDMGEXP
+str(SD)
+```
+## Aggregating the data
+
+Aggregating the output of the variables for different Event Types(EVTYPE) using the aggregate function. Type of aggregation is sum.
+
+```{r required_data}
+required_data <- SD %>% 
+    group_by(EVTYPE) %>% 
+    summarise(FATALITIES = sum(FATALITIES, na.rm = TRUE),
+              INJURIES = sum(INJURIES, na.rm = TRUE),
+              PROPDMG = sum(PROPDMG, na.rm = TRUE),
+              CROPDMG = sum(CROPDMG, na.rm = TRUE),
+              .groups = "keep")
+
+summary(required_data)
+```
+
+
+### PLOTTING THE DATA
+
+Now, after all the processing, our data ready for plotting in the data_frame called "required_data". Four bar-graphs will be plotted for FATALITIES, INJURIES, PROPDMG and CROPDMG respectively.
+
+```{r plot, fig.width = 8, fig.height = 6}
+options(scipen = 0) # For enabling scientific notation
+par(mfrow = c(2,2), mar = c(8,4,2,1))
+cols <- brewer.pal(5, "YlOrRd")
+pal <- colorRampPalette(cols)
+color <- rev(pal(10))
+for (x in c(2:5))
+{
+    names(required_data)
+    plotting_data <- as.data.frame(required_data[order(-required_data[, x]), ])
+    plotting_data <- plotting_data[c(1:10), ]
+    barplot(height = plotting_data[, x],
+            main = paste("EVTYPE v/s",names(plotting_data)[x]),
+            col = color,
+            las = 2, 
+            names.arg = plotting_data[, 1], 
+            cex.axis = 0.7, 
+            cex.names = 0.6)
+}
+```
+
+As we can see from above, most FATALITIES, INJURIES, PROPDMG and CROPDMG are caused by TORNADO, TORNADO, FLOOD, DROUGHT respectively.
+
+
+## RESULTS
+
+As we can see from the above graphs, if we talk about health damage, TORNADO event highly exceeds all other events, followed by EXCESSIVE HEAT and TSTM WIND with a difference of 4k deaths and 80k injuries respectively as compared to Tornado.
+
+If we talk about economic damage, FLOOD causes maximum property damage followed by HURRICANE/TYPHOON and DROUGHT causes maximum crop damage followed by FLOOD.
+
+Hence, according to this data, maximum measures should be taken to protect life, crop and property from Tornadoes and Floods.
+
+
+### Additional Findings
+
+We have discovered which events do the most damage to health and economy. Let's find out the origin of these events. Size of the circle in the following plots represents the damage done by the event and intensity the color represents number of event occurs.
+
+```{r additional, fig.width = 8 , fig.height = 5}    
+par(mar = c(0, 0, 3.5, 0), mfrow = c(2, 2), oma = c(5, 0, 0, 0))
+Event <- c("TORNADO", "FLOOD", "TSTM WIND", "FLASH FLOOD")
+for (x in Event){
+    for (y in c(2, 3, 4, 6)){
+        plotting_data <- SD[SD$EVTYPE == x & SD[,y] > 0, ]
+        plotting_data$LONGITUDE <- -plotting_data$LONGITUDE/100
+        plotting_data$LATITUDE <- plotting_data$LATITUDE/100
+        map("world", xlim = c(-125, -65), ylim = c(25, 50), fill = T)
+        points(plotting_data$LONGITUDE, plotting_data$LATITUDE,
+               cex = 10 * plotting_data[, y] / max(plotting_data[, y]),
+               pch = 20,
+               col = rgb(1, 0, 0, 0.25))
+        title(xlab = names(plotting_data)[y])
+    }
+    mtext(paste("Origin of", x),
+          outer = T, 
+          cex = 1.5, 
+          line = 3, 
+          side = 1)
+}
+```
+
+
+## Abbreviations Used
+
+- EVTYPE -------------- Event Type
+- FATALITIES --------- Fatalities/deaths caused
+- INJURIES ------------ Injuries caused
+- PROPDMG ----------- Damage caused to property
+- PROPDMGEXP ----- Exponents for damage caused to property
+- CROPDMG ----------- Damage caused to crop
+- CROPDMGEXP ----- Exponents for damage caused to crop
+- LONGITUDE -------- Longitude of the origin of the event
+- LATITUDE ----------- Latitude of the origin of the event
+
+
+
+
+
+
+
